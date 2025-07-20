@@ -70,3 +70,18 @@ exports.deleteProduct = async (req, res) => {
     return ApiResponse.error(res, 'Failed to delete product');
   }
 };
+exports.getProductById = async (req, res) => {
+  try {
+    const { data, error } = await supabase
+      .from('products')
+      .select('*')
+      .eq('id', req.params.id)
+      .single();
+    
+    if (error) throw error;
+    return ApiResponse.success(res, data);
+  } catch (error) {
+    console.error('Get product error:', error);
+    return ApiResponse.error(res, 'Failed to fetch product');
+  }
+};

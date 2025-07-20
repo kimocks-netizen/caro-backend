@@ -64,7 +64,7 @@ exports.getQuoteByTracking = async (req, res) => {
     return ApiResponse.success(res, quote);
   } catch (error) {
     console.error('Get quote error:', error);
-    return ApiResponse.error(res, 'Failed to fetch quote');
+    return ApiResponse.error(res, 'Failed to fetch quote or Does not exist');
   }
 };
 
@@ -82,7 +82,7 @@ exports.getAllQuotes = async (req, res) => {
     return ApiResponse.success(res, data);
   } catch (error) {
     console.error('Get quotes error:', error);
-    return ApiResponse.error(res, 'Failed to fetch quotes');
+    return ApiResponse.error(res, 'Failed to fetch quotes Or Does not exsit');
   }
 };
 
