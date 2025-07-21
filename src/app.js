@@ -8,13 +8,26 @@ const verificationRoutes = require('./routes/verificationRoutes');
 const { errorHandler } = require('./middleware/errorHandler');
 
 const app = express();
-
 app.use(cors({
   origin: process.env.ALLOWED_ORIGINS?.split(',') || '*',
-  methods: ['GET', 'POST', 'PUT', 'DELETE'],
-  allowedHeaders: ['Content-Type', 'Authorization'],
-  credentials: true
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowedHeaders: [
+    'Content-Type',
+    'Authorization',
+    'Range',
+    'X-Requested-With',
+    'Accept'
+  ],
+  exposedHeaders: [
+    'Content-Range',
+    'Content-Length',
+    'Content-Disposition',
+    'X-Total-Count'
+  ],
+  credentials: true,
+  maxAge: 86400 // 24 hours for preflight cache
 }));
+app.options('*', cors());
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 

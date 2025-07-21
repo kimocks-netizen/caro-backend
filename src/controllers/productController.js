@@ -26,7 +26,15 @@ exports.createProduct = async (req, res) => {
       .select('*')
       .single();
 
-    if (error) throw error;
+      if (error) {
+      console.error('Supabase detailed error:', {
+        message: error.message,
+        details: error.details,
+        hint: error.hint,
+        code: error.code
+      });
+      throw error;
+    }
     return ApiResponse.success(res, data, 'Product created', 201);
   } catch (error) {
     console.error('Create product error:', error);

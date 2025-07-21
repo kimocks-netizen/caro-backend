@@ -4,7 +4,14 @@ require('dotenv').config();
 const supabaseUrl = process.env.SUPABASE_URL;
 const supabaseKey = process.env.SUPABASE_KEY;
 
-exports.supabase = createClient(supabaseUrl, supabaseKey);
+exports.supabase = createClient(supabaseUrl, supabaseKey, {
+  global: {
+    headers: {
+      'Content-Type': 'multipart/form-data',
+      'X-Client-Info': 'backend'
+    }
+  }
+});
 
 exports.SupabaseModel = {
   async getAdminByEmail(email) {
@@ -23,13 +30,33 @@ exports.SupabaseModel = {
   },
 
   async createProduct(productData) {
+    // Convert image_url to array if it's not already
+    const images = Array.isArray(productData.image_url) 
+      ? productData.image_url 
+      : [productData.image_url].filter(Boolean);
+    
     return this.supabase
       .from('products')
-      .insert([productData])
+      .insert([{
+        ...productData,
+        image_url: images
+      }])
       .select('*')
       .single();
   },
-
+  async verifyAdmin(token) {
+    const { data: { user }, error } = await supabase.auth.getUser(token);
+    if (error) throw error;
+    
+    const { data: admin, error: adminError } = await supabase
+      .from('admins')
+      .select('*')
+      .eq('email', user.email)
+      .single();
+      
+    if (adminError || !admin) throw new Error('Admin not found');
+    return admin;
+  },
   async updateProduct(id, productData) {
     return this.supabase
       .from('products')
