@@ -8,25 +8,18 @@ const verificationRoutes = require('./routes/verificationRoutes');
 const { errorHandler } = require('./middleware/errorHandler');
 
 const app = express();
+// In app.js
 app.use(cors({
   origin: process.env.ALLOWED_ORIGINS?.split(',') || true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
   allowedHeaders: [
     'Content-Type',
     'Authorization',
-    'Range',
     'X-Requested-With',
     'Accept'
   ],
-  exposedHeaders: [
-    'Content-Range',
-    'Content-Length',
-    'Content-Disposition',
-    'X-Total-Count',
-    'Authorization'
-  ],
-  credentials: true,
-  maxAge: 86400 // 24 hours for preflight cache
+  // Remove credentials: true since we're using token in response
+  exposedHeaders: ['Authorization'] // Only expose needed headers
 }));
 app.options('*', cors());
 app.use(express.json());

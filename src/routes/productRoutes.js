@@ -5,7 +5,8 @@ const {
   getProductById,
   createProduct,
   updateProduct,
-  deleteProduct
+  deleteProduct,
+  uploadMiddleware,
 } = require('../controllers/productController');
 
 const router = express.Router();
@@ -14,8 +15,8 @@ const router = express.Router();
 router.get('/', getAllProducts);
 router.get('/:id', getProductById);
 
-// Admin protected routes
-router.post('/', authenticate, adminOnly, createProduct);
+// Admin protected routes with upload middleware only on POST
+router.post('/', authenticate, adminOnly, uploadMiddleware, createProduct);
 router.put('/:id', authenticate, adminOnly, updateProduct);
 router.delete('/:id', authenticate, adminOnly, deleteProduct);
 

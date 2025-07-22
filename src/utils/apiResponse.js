@@ -16,4 +16,5 @@ class ApiResponse {
   }
 }
 
-module.exports = { ApiResponse };
+// Change to direct export
+module.exports = ApiResponse;

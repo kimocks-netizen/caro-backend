@@ -15,3 +15,4 @@ bcrypt.hash(password, saltRounds, function(err, hash) {
     console.log(hash);
   }
 });
+//Command e.g= node srcnode src/hashPasswords.js 12345/hashPasswords.js 12345
