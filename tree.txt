@@ -1,34 +1,34 @@
 backend/
 ├── src/
 │   ├── controllers/
-│   │   ├── authController.ts
-│   │   ├── quoteController.ts
-│   │   ├── productController.ts
-│   │   └── verificationController.ts
+│   │   ├── authControllerjs
+│   │   ├── quoteControllerjs
+│   │   ├── productControllerjs
+│   │   └── verificationControllerjs
 │   │
 │   ├── middleware/
-│   │   ├── auth.ts
-│   │   ├── roleCheck.ts
-│   │   └── errorHandler.ts
+│   │   ├── authjs
+│   │   ├── roleCheckjs
+│   │   └── errorHandlerjs
 │   │
 │   ├── models/
-│   │   └── supabaseModel.ts
+│   │   └── supabaseModeljs
 │   │
 │   ├── routes/
-│   │   ├── authRoutes.ts
-│   │   ├── quoteRoutes.ts
-│   │   ├── productRoutes.ts
-│   │   └── verificationRoutes.ts
+│   │   ├── authRoutesjs
+│   │   ├── quoteRoutesjs
+│   │   ├── productRoutesjs
+│   │   └── verificationRoutesjs
 │   │
 │   ├── types/
-│   │   ├── express.d.ts      ✅ Express Request extension only
-│   │   └── user.ts
+│   │   ├── express.djs      ✅ Express Request extension only
+│   │   └── userjs
 │   │
 │   ├── utils/
-│   │   ├── emailService.ts
-│   │   └── generateTracking.ts
+│   │   ├── emailServicejs
+│   │   └── generateTrackingjs
 │   │
-│   └── app.ts                ✅ Main server file
+│   └── appjs                ✅ Main server file
 │
 ├── package.json
 ├── tsconfig.json
