@@ -3,6 +3,15 @@ const { generateTrackingCode } = require('../utils/generateTracking');
 const { sendVerificationEmail } = require('../utils/emailService');
 const { ApiResponse } = require('../utils/apiResponse');
 
+// Generate quote number
+const generateQuoteNumber = () => {
+  const date = new Date();
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const random = Math.floor(Math.random() * 1000).toString().padStart(3, '0');
+  return `QUO-${year}${month}-${random}`;
+};
+
 exports.submitQuote = async (req, res) => {
   const { name, email, items, message } = req.body;
 
@@ -58,12 +67,14 @@ exports.submitQuote = async (req, res) => {
     }
 
     const trackingCode = generateTrackingCode();
+    const quoteNumber = generateQuoteNumber();
 
     // Create the quote
     const { data: quote, error: quoteError } = await supabase
       .from('quotes')
       .insert([{
         tracking_code: trackingCode,
+        quote_number: quoteNumber,
         guest_name: name,
         guest_email: email,
         notes: message,
@@ -108,7 +119,7 @@ exports.submitQuote = async (req, res) => {
       // Don't fail the quote submission if email fails
     }
 
-    return ApiResponse.success(res, { trackingCode }, 'Quote submitted successfully', 201);
+    return ApiResponse.success(res, { trackingCode, quoteNumber }, 'Quote submitted successfully', 201);
   } catch (error) {
     console.error('Submit quote error:', error);
     return ApiResponse.error(res, 'Failed to submit quote');
@@ -156,9 +167,34 @@ exports.getAllQuotes = async (req, res) => {
   }
 };
 
+exports.getQuoteById = async (req, res) => {
+  const { id } = req.params;
+
+  try {
+    const { data: quote, error } = await supabase
+      .from('quotes')
+      .select(`
+        *,
+        quote_items:quote_items(*, product:products(*))
+      `)
+      .eq('id', id)
+      .single();
+
+    if (error) throw error;
+    if (!quote) return ApiResponse.error(res, 'Quote not found', 404);
+
+    return ApiResponse.success(res, quote);
+  } catch (error) {
+    console.error('Get quote by ID error:', error);
+    return ApiResponse.error(res, 'Failed to fetch quote');
+  }
+};
+
 exports.updateQuoteStatus = async (req, res) => {
   const { id } = req.params;
   const { status, admin_notes } = req.body;
+
+  console.log('Updating quote:', { id, status, admin_notes });
 
   // Validate status
   const validStatuses = ['pending', 'in_progress', 'quoted', 'quote_issued', 'rejected'];
@@ -167,17 +203,116 @@ exports.updateQuoteStatus = async (req, res) => {
   }
 
   try {
+    const updateData = {};
+    if (status) updateData.status = status;
+    if (admin_notes !== undefined) updateData.admin_notes = admin_notes;
+    updateData.updated_at = new Date().toISOString();
+
+    console.log('Update data:', updateData);
+
     const { data, error } = await supabase
       .from('quotes')
-      .update({ status, admin_notes })
+      .update(updateData)
       .eq('id', id)
       .select('*')
       .single();
 
-    if (error) throw error;
+    if (error) {
+      console.error('Database update error:', error);
+      throw error;
+    }
+
+    console.log('Quote updated successfully:', data);
     return ApiResponse.success(res, data, 'Quote updated');
   } catch (error) {
     console.error('Update quote error:', error);
     return ApiResponse.error(res, 'Failed to update quote');
+  }
+};
+
+exports.updateQuotePricing = async (req, res) => {
+  const { id } = req.params;
+  const { items } = req.body;
+
+  try {
+    // Update each quote item with pricing
+    for (const item of items) {
+      const { error } = await supabase
+        .from('quote_items')
+        .update({
+          unit_price: item.unit_price,
+          total_price: item.unit_price * item.quantity
+        })
+        .eq('id', item.id);
+
+      if (error) throw error;
+    }
+
+    // Get updated quote with calculated totals
+    const { data: quote, error } = await supabase
+      .from('quotes')
+      .select(`
+        *,
+        quote_items:quote_items(*, product:products(*))
+      `)
+      .eq('id', id)
+      .single();
+
+    if (error) throw error;
+
+    return ApiResponse.success(res, quote, 'Quote pricing updated');
+  } catch (error) {
+    console.error('Update quote pricing error:', error);
+    return ApiResponse.error(res, 'Failed to update quote pricing');
+  }
+};
+
+exports.issueQuote = async (req, res) => {
+  const { id } = req.params;
+  const { items } = req.body;
+
+  try {
+    // Update quote status to issued
+    const { error: statusError } = await supabase
+      .from('quotes')
+      .update({ 
+        status: 'quote_issued',
+        updated_at: new Date().toISOString()
+      })
+      .eq('id', id);
+
+    if (statusError) throw statusError;
+
+    // Update pricing if provided
+    if (items && items.length > 0) {
+      for (const item of items) {
+        const { error } = await supabase
+          .from('quote_items')
+          .update({
+            unit_price: item.unit_price,
+            total_price: item.unit_price * item.quantity
+          })
+          .eq('id', item.id);
+
+        if (error) throw error;
+      }
+    }
+
+    // Get updated quote
+    const { data: quote, error } = await supabase
+      .from('quotes')
+      .select(`
+        *,
+        quote_items:quote_items(*, product:products(*))
+      `)
+      .eq('id', id)
+      .single();
+
+    if (error) throw error;
+
+    return ApiResponse.success(res, quote, 'Quote issued successfully');
+  } catch (error) {
+    console.error('Issue quote error:', error);
+    return ApiResponse.error(res, 'Failed to issue quote');
   }
 };
