@@ -1,11 +1,24 @@
 const { createClient } = require('@supabase/supabase-js');
 require('dotenv').config();
 
-// Simplified Supabase client
+// Supabase client configuration
 const supabaseUrl = process.env.SUPABASE_URL;
-const supabaseKey = process.env.SUPABASE_KEY;
+const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_KEY;
 
-exports.supabase = createClient(supabaseUrl, supabaseKey);
+if (!supabaseUrl || !supabaseServiceKey) {
+  console.error('Missing Supabase environment variables');
+  console.error('SUPABASE_URL:', !!process.env.SUPABASE_URL);
+  console.error('SUPABASE_SERVICE_ROLE_KEY:', !!process.env.SUPABASE_SERVICE_ROLE_KEY);
+  console.error('SUPABASE_KEY:', !!process.env.SUPABASE_KEY);
+}
+
+// Create Supabase client with available key
+exports.supabase = createClient(supabaseUrl, supabaseServiceKey, {
+  auth: {
+    autoRefreshToken: false,
+    persistSession: false
+  }
+});
 
 // Storage helper functions
 exports.uploadProductImage = async (fileBuffer, fileName, bucket = 'product-images') => {

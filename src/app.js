@@ -7,6 +7,27 @@ const quoteRoutes = require('./routes/quoteRoutes');
 const verificationRoutes = require('./routes/verificationRoutes');
 const { errorHandler } = require('./middleware/errorHandler');
 
+// Validate only essential environment variables for quotes
+const requiredEnvVars = [
+  'SUPABASE_URL',
+  'JWT_SECRET'
+];
+
+const missingEnvVars = requiredEnvVars.filter(varName => !process.env[varName]);
+
+if (missingEnvVars.length > 0) {
+  console.error('Missing required environment variables:', missingEnvVars);
+  console.error('Please check your .env file or environment configuration');
+  process.exit(1);
+}
+
+// Check if service role key is available (optional for now)
+if (!process.env.SUPABASE_SERVICE_ROLE_KEY) {
+  console.warn('Warning: SUPABASE_SERVICE_ROLE_KEY not set. Using SUPABASE_KEY as fallback.');
+}
+
+console.log('Environment variables validated successfully');
+
 const app = express();
 
 // Parse ALLOWED_ORIGINS from environment variable

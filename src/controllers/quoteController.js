@@ -9,6 +9,23 @@ exports.submitQuote = async (req, res) => {
   // Add debugging
   console.log('Received quote submission:', { name, email, items, message });
 
+  // Test Supabase connection
+  try {
+    const { data: testData, error: testError } = await supabase
+      .from('products')
+      .select('id')
+      .limit(1);
+    
+    if (testError) {
+      console.error('Supabase connection test failed:', testError);
+      return ApiResponse.error(res, `Database connection failed: ${testError.message}`, 500);
+    }
+    console.log('Supabase connection test successful');
+  } catch (error) {
+    console.error('Supabase connection error:', error);
+    return ApiResponse.error(res, 'Database connection error', 500);
+  }
+
   // Validate required fields
   if (!name || !email || !items || !Array.isArray(items) || items.length === 0) {
     return ApiResponse.error(res, 'Missing required fields: name, email, and items array', 400);
@@ -26,7 +43,7 @@ exports.submitQuote = async (req, res) => {
 
     if (productsError) {
       console.error('Products validation error:', productsError);
-      throw productsError;
+      return ApiResponse.error(res, `Database error: ${productsError.message}`, 500);
     }
 
     console.log('Existing products found:', existingProducts);
@@ -42,6 +59,7 @@ exports.submitQuote = async (req, res) => {
 
     const trackingCode = generateTrackingCode();
 
+    // Create the quote
     const { data: quote, error: quoteError } = await supabase
       .from('quotes')
       .insert([{
@@ -56,11 +74,12 @@ exports.submitQuote = async (req, res) => {
 
     if (quoteError) {
       console.error('Quote creation error:', quoteError);
-      throw quoteError;
+      return ApiResponse.error(res, `Failed to create quote: ${quoteError.message}`, 500);
     }
 
     console.log('Quote created:', quote);
 
+    // Create quote items
     const quoteItems = items.map((item) => ({
       quote_id: quote.id,
       product_id: item.productId,
@@ -76,12 +95,20 @@ exports.submitQuote = async (req, res) => {
 
     if (itemsError) {
       console.error('Quote items insertion error:', itemsError);
-      throw itemsError;
+      // If quote items fail, we should clean up the quote
+      await supabase.from('quotes').delete().eq('id', quote.id);
+      return ApiResponse.error(res, `Failed to create quote items: ${itemsError.message}`, 500);
     }
 
-    await sendVerificationEmail(email, trackingCode);
+    // Send verification email (optional - don't fail if email fails)
+    try {
+      await sendVerificationEmail(email, trackingCode);
+    } catch (emailError) {
+      console.error('Email sending failed:', emailError);
+      // Don't fail the quote submission if email fails
+    }
 
-    return ApiResponse.success(res, { trackingCode }, 'Quote submitted', 201);
+    return ApiResponse.success(res, { trackingCode }, 'Quote submitted successfully', 201);
   } catch (error) {
     console.error('Submit quote error:', error);
     return ApiResponse.error(res, 'Failed to submit quote');
