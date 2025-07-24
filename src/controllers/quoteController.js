@@ -160,6 +160,12 @@ exports.updateQuoteStatus = async (req, res) => {
   const { id } = req.params;
   const { status, admin_notes } = req.body;
 
+  // Validate status
+  const validStatuses = ['pending', 'in_progress', 'quoted', 'quote_issued', 'rejected'];
+  if (status && !validStatuses.includes(status)) {
+    return ApiResponse.error(res, `Invalid status. Must be one of: ${validStatuses.join(', ')}`, 400);
+  }
+
   try {
     const { data, error } = await supabase
       .from('quotes')
