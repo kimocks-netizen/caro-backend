@@ -199,10 +199,37 @@ exports.updateQuoteStatus = async (req, res) => {
   // Validate status
   const validStatuses = ['pending', 'in_progress', 'quoted', 'quote_issued', 'rejected'];
   if (status && !validStatuses.includes(status)) {
+    console.error('Invalid status provided:', status);
+    console.error('Valid statuses:', validStatuses);
     return ApiResponse.error(res, `Invalid status. Must be one of: ${validStatuses.join(', ')}`, 400);
   }
 
+  console.log('Status validation passed. Status:', status);
+
   try {
+    // First check if quote exists
+    const { data: existingQuotes, error: fetchError } = await supabase
+      .from('quotes')
+      .select('*')
+      .eq('id', id);
+
+    if (fetchError) {
+      console.error('Database fetch error:', fetchError);
+      return ApiResponse.error(res, `Database error: ${fetchError.message}`, 500);
+    }
+
+    if (!existingQuotes || existingQuotes.length === 0) {
+      console.error('Quote not found with ID:', id);
+      return ApiResponse.error(res, 'Quote not found', 404);
+    }
+
+    if (existingQuotes.length > 1) {
+      console.error('Multiple quotes found with same ID:', id);
+      return ApiResponse.error(res, 'Database integrity error: Multiple quotes with same ID', 500);
+    }
+
+    const existingQuote = existingQuotes[0];
+
     const updateData = {};
     if (status) updateData.status = status;
     if (admin_notes !== undefined) updateData.admin_notes = admin_notes;
@@ -210,23 +237,64 @@ exports.updateQuoteStatus = async (req, res) => {
 
     console.log('Update data:', updateData);
 
-    const { data, error } = await supabase
+    console.log('Attempting to update quote with ID:', id);
+    console.log('Update data:', updateData);
+    
+    // Try the update without select first to see if it works
+    const { error: updateError } = await supabase
       .from('quotes')
       .update(updateData)
-      .eq('id', id)
-      .select('*')
-      .single();
+      .eq('id', id);
 
-    if (error) {
-      console.error('Database update error:', error);
-      throw error;
+    console.log('Update without select - error:', updateError);
+
+    if (updateError) {
+      console.error('Database update error:', updateError);
+      return ApiResponse.error(res, `Database error: ${updateError.message}`, 500);
     }
+
+    // Now fetch the updated quote with a small delay to ensure update is committed
+    await new Promise(resolve => setTimeout(resolve, 100));
+    
+    const { data: updatedQuotes, error: fetchUpdatedError } = await supabase
+      .from('quotes')
+      .select('*')
+      .eq('id', id);
+
+    console.log('Fetch updated quote - error:', fetchUpdatedError);
+    console.log('Fetch updated quote - data:', updatedQuotes);
+
+    if (fetchUpdatedError) {
+      console.error('Database fetch error:', fetchUpdatedError);
+      return ApiResponse.error(res, `Database error: ${fetchUpdatedError.message}`, 500);
+    }
+
+    if (!updatedQuotes || updatedQuotes.length === 0) {
+      console.error('No quotes updated with ID:', id);
+      // Let's check if the quote still exists
+      const { data: checkQuotes, error: checkError } = await supabase
+        .from('quotes')
+        .select('*')
+        .eq('id', id);
+      
+      console.log('Check quotes result:', checkQuotes);
+      console.log('Check error:', checkError);
+      
+      return ApiResponse.error(res, 'Failed to update quote', 500);
+    }
+
+    const data = updatedQuotes[0];
+    
+    // Verify the update actually happened
+    console.log('Original status:', existingQuote.status);
+    console.log('Updated status:', data.status);
+    console.log('Status changed:', existingQuote.status !== data.status);
 
     console.log('Quote updated successfully:', data);
     return ApiResponse.success(res, data, 'Quote updated');
   } catch (error) {
     console.error('Update quote error:', error);
-    return ApiResponse.error(res, 'Failed to update quote');
+    return ApiResponse.error(res, `Failed to update quote: ${error.message}`, 500);
   }
 };
 
