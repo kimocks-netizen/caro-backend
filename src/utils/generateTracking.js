@@ -1,4 +1,4 @@
-exports.generateTrackingCode = () => {
+export const generateTrackingCode = () => {
   const prefix = 'QUO-';
   const chars = '0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ';
   let result = '';

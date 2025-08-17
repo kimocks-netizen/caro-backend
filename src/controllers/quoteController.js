@@ -1,7 +1,8 @@
-const { supabase } = require('../models/supabaseModel');
-const { generateTrackingCode } = require('../utils/generateTracking');
-const { sendVerificationEmail } = require('../utils/emailService');
-const { ApiResponse } = require('../utils/apiResponse');
+//quoteController.js
+import { createSupabaseClient } from '../models/supabaseModel.js';
+import { generateTrackingCode } from '../utils/generateTracking.js';
+import { sendVerificationEmail } from '../utils/emailService.js';
+import { ApiResponse } from '../utils/apiResponse.js';
 
 // Generate quote number
 const generateQuoteNumber = () => {
@@ -12,14 +13,15 @@ const generateQuoteNumber = () => {
   return `QUO-${year}${month}-${random}`;
 };
 
-exports.submitQuote = async (req, res) => {
-  const { name, email, items, message } = req.body;
+export const submitQuote = async (body, env) => {
+  const { name, email, items, message } = body;
 
   // Add debugging
   console.log('Received quote submission:', { name, email, items, message });
 
   // Test Supabase connection
   try {
+    const supabase = createSupabaseClient(env);
     const { data: testData, error: testError } = await supabase
       .from('products')
       .select('id')
@@ -27,20 +29,22 @@ exports.submitQuote = async (req, res) => {
     
     if (testError) {
       console.error('Supabase connection test failed:', testError);
-      return ApiResponse.error(res, `Database connection failed: ${testError.message}`, 500);
+      return ApiResponse.error(`Database connection failed: ${testError.message}`, 500);
     }
     console.log('Supabase connection test successful');
   } catch (error) {
     console.error('Supabase connection error:', error);
-    return ApiResponse.error(res, 'Database connection error', 500);
+    return ApiResponse.error('Database connection error', 500);
   }
 
   // Validate required fields
   if (!name || !email || !items || !Array.isArray(items) || items.length === 0) {
-    return ApiResponse.error(res, 'Missing required fields: name, email, and items array', 400);
+    return ApiResponse.error('Missing required fields: name, email, and items array', 400);
   }
 
   try {
+    const supabase = createSupabaseClient(env);
+    
     // Validate that all products exist before creating the quote
     const productIds = items.map(item => item.productId);
     console.log('Product IDs to validate:', productIds);
@@ -52,7 +56,7 @@ exports.submitQuote = async (req, res) => {
 
     if (productsError) {
       console.error('Products validation error:', productsError);
-      return ApiResponse.error(res, `Database error: ${productsError.message}`, 500);
+      return ApiResponse.error(`Database error: ${productsError.message}`, 500);
     }
 
     console.log('Existing products found:', existingProducts);
@@ -63,7 +67,7 @@ exports.submitQuote = async (req, res) => {
     
     if (missingProducts.length > 0) {
       console.log('Missing products:', missingProducts);
-      return ApiResponse.error(res, `Products not found: ${missingProducts.join(', ')}`, 400);
+      return ApiResponse.error(`Products not found: ${missingProducts.join(', ')}`, 400);
     }
 
     const trackingCode = generateTrackingCode();
@@ -85,7 +89,7 @@ exports.submitQuote = async (req, res) => {
 
     if (quoteError) {
       console.error('Quote creation error:', quoteError);
-      return ApiResponse.error(res, `Failed to create quote: ${quoteError.message}`, 500);
+      return ApiResponse.error(`Failed to create quote: ${quoteError.message}`, 500);
     }
 
     console.log('Quote created:', quote);
@@ -98,289 +102,109 @@ exports.submitQuote = async (req, res) => {
       message: item.message || ''
     }));
 
-    console.log('Quote items to insert:', quoteItems);
-
     const { error: itemsError } = await supabase
       .from('quote_items')
       .insert(quoteItems);
 
     if (itemsError) {
-      console.error('Quote items insertion error:', itemsError);
-      // If quote items fail, we should clean up the quote
+      console.error('Quote items creation error:', itemsError);
+      // Try to delete the quote if items creation fails
       await supabase.from('quotes').delete().eq('id', quote.id);
-      return ApiResponse.error(res, `Failed to create quote items: ${itemsError.message}`, 500);
+      return ApiResponse.error(`Failed to create quote items: ${itemsError.message}`, 500);
     }
 
-    // Send verification email (optional - don't fail if email fails)
+    // Send verification email
     try {
-      await sendVerificationEmail(email, trackingCode);
+      await sendVerificationEmail(email, trackingCode, env);
+      console.log('Verification email sent successfully');
     } catch (emailError) {
-      console.error('Email sending failed:', emailError);
-      // Don't fail the quote submission if email fails
+      console.error('Failed to send verification email:', emailError);
+      // Don't fail the quote creation if email fails
     }
 
-    return ApiResponse.success(res, { trackingCode, quoteNumber }, 'Quote submitted successfully', 201);
+    return ApiResponse.success({
+      quote_id: quote.id,
+      tracking_code: trackingCode,
+      quote_number: quoteNumber,
+      message: 'Quote submitted successfully'
+    }, 'Quote submitted successfully', 201);
+
   } catch (error) {
     console.error('Submit quote error:', error);
-    return ApiResponse.error(res, 'Failed to submit quote');
+    return ApiResponse.error('Failed to submit quote');
   }
 };
 
-exports.getQuoteByTracking = async (req, res) => {
-  const { trackingCode } = req.params;
-
+export const getQuoteById = async (id, env) => {
   try {
+    const supabase = createSupabaseClient(env);
     const { data: quote, error } = await supabase
       .from('quotes')
       .select(`
         *,
-        quote_items:quote_items(*, product:products(*))
+        quote_items (
+          *,
+          products (*)
+        )
       `)
-      .eq('tracking_code', trackingCode)
+      .eq('id', id)
       .single();
 
-    if (error) throw error;
-    if (!quote) return ApiResponse.error(res, 'Quote not found', 404);
+    if (error || !quote) {
+      return ApiResponse.error('Quote not found', 404);
+    }
 
-    return ApiResponse.success(res, quote);
+    return ApiResponse.success(quote, 'Quote retrieved successfully');
   } catch (error) {
-    console.error('Get quote error:', error);
-    return ApiResponse.error(res, 'Failed to fetch quote or Does not exist');
+    console.error('Get quote by ID error:', error);
+    return ApiResponse.error('Failed to retrieve quote');
   }
 };
 
-exports.getAllQuotes = async (req, res) => {
+export const getAllQuotes = async (env) => {
   try {
-    const { data, error } = await supabase
+    const supabase = createSupabaseClient(env);
+    const { data: quotes, error } = await supabase
       .from('quotes')
       .select(`
         *,
-        quote_items:quote_items(*, product:products(*))
+        quote_items (
+          *,
+          products (*)
+        )
       `)
       .order('created_at', { ascending: false });
 
     if (error) throw error;
-    return ApiResponse.success(res, data);
+    return ApiResponse.success(quotes, 'Quotes retrieved successfully');
   } catch (error) {
-    console.error('Get quotes error:', error);
-    return ApiResponse.error(res, 'Failed to fetch quotes Or Does not exsit');
+    console.error('Get all quotes error:', error);
+    return ApiResponse.error('Failed to retrieve quotes');
   }
 };
 
-exports.getQuoteById = async (req, res) => {
-  const { id } = req.params;
-
+export const updateQuoteStatus = async (id, body, env) => {
   try {
-    const { data: quote, error } = await supabase
+    const { status } = body;
+    if (!status) {
+      return ApiResponse.error('Status is required', 400);
+    }
+
+    const supabase = createSupabaseClient(env);
+    const { data, error } = await supabase
       .from('quotes')
-      .select(`
-        *,
-        quote_items:quote_items(*, product:products(*))
-      `)
+      .update({ status })
       .eq('id', id)
-      .single();
-
-    if (error) throw error;
-    if (!quote) return ApiResponse.error(res, 'Quote not found', 404);
-
-    return ApiResponse.success(res, quote);
-  } catch (error) {
-    console.error('Get quote by ID error:', error);
-    return ApiResponse.error(res, 'Failed to fetch quote');
-  }
-};
-
-exports.updateQuoteStatus = async (req, res) => {
-  const { id } = req.params;
-  const { status, admin_notes } = req.body;
-
-  console.log('Updating quote:', { id, status, admin_notes });
-
-  // Validate status
-  const validStatuses = ['pending', 'in_progress', 'quoted', 'quote_issued', 'rejected'];
-  if (status && !validStatuses.includes(status)) {
-    console.error('Invalid status provided:', status);
-    console.error('Valid statuses:', validStatuses);
-    return ApiResponse.error(res, `Invalid status. Must be one of: ${validStatuses.join(', ')}`, 400);
-  }
-
-  console.log('Status validation passed. Status:', status);
-
-  try {
-    // First check if quote exists
-    const { data: existingQuotes, error: fetchError } = await supabase
-      .from('quotes')
       .select('*')
-      .eq('id', id);
-
-    if (fetchError) {
-      console.error('Database fetch error:', fetchError);
-      return ApiResponse.error(res, `Database error: ${fetchError.message}`, 500);
-    }
-
-    if (!existingQuotes || existingQuotes.length === 0) {
-      console.error('Quote not found with ID:', id);
-      return ApiResponse.error(res, 'Quote not found', 404);
-    }
-
-    if (existingQuotes.length > 1) {
-      console.error('Multiple quotes found with same ID:', id);
-      return ApiResponse.error(res, 'Database integrity error: Multiple quotes with same ID', 500);
-    }
-
-    const existingQuote = existingQuotes[0];
-
-    const updateData = {};
-    if (status) updateData.status = status;
-    if (admin_notes !== undefined) updateData.admin_notes = admin_notes;
-    updateData.updated_at = new Date().toISOString();
-
-    console.log('Update data:', updateData);
-
-    console.log('Attempting to update quote with ID:', id);
-    console.log('Update data:', updateData);
-    
-    // Try the update without select first to see if it works
-    const { error: updateError } = await supabase
-      .from('quotes')
-      .update(updateData)
-      .eq('id', id);
-
-    console.log('Update without select - error:', updateError);
-
-    if (updateError) {
-      console.error('Database update error:', updateError);
-      return ApiResponse.error(res, `Database error: ${updateError.message}`, 500);
-    }
-
-    // Now fetch the updated quote with a small delay to ensure update is committed
-    await new Promise(resolve => setTimeout(resolve, 100));
-    
-    const { data: updatedQuotes, error: fetchUpdatedError } = await supabase
-      .from('quotes')
-      .select('*')
-      .eq('id', id);
-
-    console.log('Fetch updated quote - error:', fetchUpdatedError);
-    console.log('Fetch updated quote - data:', updatedQuotes);
-
-    if (fetchUpdatedError) {
-      console.error('Database fetch error:', fetchUpdatedError);
-      return ApiResponse.error(res, `Database error: ${fetchUpdatedError.message}`, 500);
-    }
-
-    if (!updatedQuotes || updatedQuotes.length === 0) {
-      console.error('No quotes updated with ID:', id);
-      // Let's check if the quote still exists
-      const { data: checkQuotes, error: checkError } = await supabase
-        .from('quotes')
-        .select('*')
-        .eq('id', id);
-      
-      console.log('Check quotes result:', checkQuotes);
-      console.log('Check error:', checkError);
-      
-      return ApiResponse.error(res, 'Failed to update quote', 500);
-    }
-
-    const data = updatedQuotes[0];
-    
-    // Verify the update actually happened
-    console.log('Original status:', existingQuote.status);
-    console.log('Updated status:', data.status);
-    console.log('Status changed:', existingQuote.status !== data.status);
-
-    console.log('Quote updated successfully:', data);
-    return ApiResponse.success(res, data, 'Quote updated');
-  } catch (error) {
-    console.error('Update quote error:', error);
-    return ApiResponse.error(res, `Failed to update quote: ${error.message}`, 500);
-  }
-};
-
-exports.updateQuotePricing = async (req, res) => {
-  const { id } = req.params;
-  const { items } = req.body;
-
-  try {
-    // Update each quote item with pricing
-    for (const item of items) {
-      const { error } = await supabase
-        .from('quote_items')
-        .update({
-          unit_price: item.unit_price,
-          total_price: item.unit_price * item.quantity
-        })
-        .eq('id', item.id);
-
-      if (error) throw error;
-    }
-
-    // Get updated quote with calculated totals
-    const { data: quote, error } = await supabase
-      .from('quotes')
-      .select(`
-        *,
-        quote_items:quote_items(*, product:products(*))
-      `)
-      .eq('id', id)
       .single();
 
-    if (error) throw error;
-
-    return ApiResponse.success(res, quote, 'Quote pricing updated');
-  } catch (error) {
-    console.error('Update quote pricing error:', error);
-    return ApiResponse.error(res, 'Failed to update quote pricing');
-  }
-};
-
-exports.issueQuote = async (req, res) => {
-  const { id } = req.params;
-  const { items } = req.body;
-
-  try {
-    // Update quote status to issued
-    const { error: statusError } = await supabase
-      .from('quotes')
-      .update({ 
-        status: 'quote_issued',
-        updated_at: new Date().toISOString()
-      })
-      .eq('id', id);
-
-    if (statusError) throw statusError;
-
-    // Update pricing if provided
-    if (items && items.length > 0) {
-      for (const item of items) {
-        const { error } = await supabase
-          .from('quote_items')
-          .update({
-            unit_price: item.unit_price,
-            total_price: item.unit_price * item.quantity
-          })
-          .eq('id', item.id);
-
-        if (error) throw error;
-      }
+    if (error || !data) {
+      return ApiResponse.error('Quote not found', 404);
     }
 
-    // Get updated quote
-    const { data: quote, error } = await supabase
-      .from('quotes')
-      .select(`
-        *,
-        quote_items:quote_items(*, product:products(*))
-      `)
-      .eq('id', id)
-      .single();
-
-    if (error) throw error;
-
-    return ApiResponse.success(res, quote, 'Quote issued successfully');
+    return ApiResponse.success(data, 'Quote status updated successfully');
   } catch (error) {
-    console.error('Issue quote error:', error);
-    return ApiResponse.error(res, 'Failed to issue quote');
+    console.error('Update quote status error:', error);
+    return ApiResponse.error('Failed to update quote status');
   }
 };

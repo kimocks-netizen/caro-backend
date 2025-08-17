@@ -1,32 +1,33 @@
-const { supabase } = require('../models/supabaseModel');
-const { ApiResponse } = require('../utils/apiResponse');
-const { verifyCode, sendVerificationEmail } = require('../utils/emailService');
+//verificationController.js
+import { createSupabaseClient } from '../models/supabaseModel.js';
+import { ApiResponse } from '../utils/apiResponse.js';
+import { verifyCode, sendVerificationEmail } from '../utils/emailService.js';
 
-exports.verifyEmailCode = async (req, res) => {
-  const { email, code } = req.body;
+export const verifyEmailCode = async (body, env) => {
+  const { email, code } = body;
 
   try {
-    const { valid, message } = await verifyCode(email, code);
+    const { valid, message } = await verifyCode(email, code, env);
     
     if (!valid) {
-      return ApiResponse.error(res, message || 'Invalid verification code', 400);
+      return ApiResponse.error(message || 'Invalid verification code', 400);
     }
 
-    return ApiResponse.success(res, null, 'Email verified successfully');
+    return ApiResponse.success(null, 'Email verified successfully');
   } catch (error) {
     console.error('Verification error:', error);
-    return ApiResponse.error(res, 'Verification failed');
+    return ApiResponse.error('Verification failed');
   }
 };
 
-exports.resendVerification = async (req, res) => {
-  const { email, trackingCode } = req.body;
+export const resendVerification = async (body, env) => {
+  const { email, trackingCode } = body;
 
   try {
-    await sendVerificationEmail(email, trackingCode);
-    return ApiResponse.success(res, null, 'Verification email resent');
+    await sendVerificationEmail(email, trackingCode, env);
+    return ApiResponse.success(null, 'Verification email resent');
   } catch (error) {
     console.error('Resend verification error:', error);
-    return ApiResponse.error(res, 'Failed to resend verification');
+    return ApiResponse.error('Failed to resend verification');
   }
 };

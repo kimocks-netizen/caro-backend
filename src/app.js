@@ -1,93 +1,122 @@
-const express = require('express');
-const cors = require('cors');
-require('dotenv').config();
-const authRoutes = require('./routes/authRoutes');
-const productRoutes = require('./routes/productRoutes');
-const quoteRoutes = require('./routes/quoteRoutes');
-const verificationRoutes = require('./routes/verificationRoutes');
-const { errorHandler } = require('./middleware/errorHandler');
+// Cloudflare Worker entry point
+export default {
+  async fetch(request, env, ctx) {
+    try {
+      const url = new URL(request.url);
+      const path = url.pathname;
+      const method = request.method;
 
-// Validate only essential environment variables for quotes
-const requiredEnvVars = [
-  'SUPABASE_URL',
-  'JWT_SECRET'
-];
+      // Handle CORS preflight
+      if (method === 'OPTIONS') {
+        return handleCORS(new Response(null, { status: 200 }));
+      }
 
-const missingEnvVars = requiredEnvVars.filter(varName => !process.env[varName]);
+      // Route handling
+      if (path.startsWith('/api/auth')) {
+        return await handleAuthRoutes(request, env, path);
+      } else if (path.startsWith('/api/products')) {
+        return await handleProductRoutes(request, env, path);
+      } else if (path.startsWith('/api/quotes')) {
+        return await handleQuoteRoutes(request, env, path);
+      } else if (path.startsWith('/api/verify')) {
+        return await handleVerificationRoutes(request, env, path);
+      }
 
-if (missingEnvVars.length > 0) {
-  console.error('Missing required environment variables:', missingEnvVars);
-  console.error('Please check your .env file or environment configuration');
-  process.exit(1);
-}
-
-// Check if service role key is available (optional for now)
-if (!process.env.SUPABASE_SERVICE_ROLE_KEY) {
-  console.warn('Warning: SUPABASE_SERVICE_ROLE_KEY not set. Using SUPABASE_KEY as fallback.');
-}
-
-console.log('Environment variables validated successfully');
-
-const app = express();
-
-// Parse ALLOWED_ORIGINS from environment variable
-const allowedOrigins = process.env.ALLOWED_ORIGINS?.split(',') || [];
-
-// Enhanced CORS configuration
-const corsOptions = {
-  origin: (origin, callback) => {
-    // Allow requests with no origin (like mobile apps or curl requests)
-    if (!origin) return callback(null, true);
-    
-    // Allow localhost for development
-    if (origin.includes('localhost') || origin.includes('127.0.0.1')) {
-      return callback(null, true);
+      // Default response
+      return new Response('Not Found', { status: 404 });
+    } catch (error) {
+      console.error('Worker error:', error);
+      return new Response('Internal Server Error', { status: 500 });
     }
-    
-    if (allowedOrigins.includes(origin) || allowedOrigins.includes(origin.replace(/\/$/, ''))) {
-      callback(null, true);
-    } else {
-      callback(new Error('Not allowed by CORS'));
-    }
-  },
-  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-  allowedHeaders: [
-    'Content-Type',
-    'Authorization',
-    'Range',
-    'X-Requested-With',
-    'Accept'
-  ],
-  exposedHeaders: [
-    'Content-Range',
-    'Content-Length',
-    'Content-Disposition',
-    'X-Total-Count',
-    'Authorization'
-  ],
-  credentials: true,
-  maxAge: 86400
+  }
 };
 
-// Apply CORS middleware
-app.use(cors(corsOptions));
+// CORS handler
+function handleCORS(response) {
+  response.headers.set('Access-Control-Allow-Origin', '*');
+  response.headers.set('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
+  response.headers.set('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+  return response;
+}
 
-// Handle preflight requests
-app.options('*', cors(corsOptions));
+// Auth routes handler
+async function handleAuthRoutes(request, env, path) {
+  // Import auth controller functions
+  const { login, register, verifyToken } = await import('./controllers/authController.js');
+  
+  if (path === '/api/auth/login' && request.method === 'POST') {
+    const body = await request.json();
+    return await login(body, env);
+  } else if (path === '/api/auth/register' && request.method === 'POST') {
+    const body = await request.json();
+    return await register(body, env);
+  } else if (path === '/api/auth/verify' && request.method === 'POST') {
+    const body = await request.json();
+    return await verifyToken(body, env);
+  }
+  
+  return new Response('Not Found', { status: 404 });
+}
 
-app.use(express.json());
-app.use(express.urlencoded({ extended: true }));
+// Product routes handler
+async function handleProductRoutes(request, env, path) {
+  // Import product controller functions
+  const { getAllProducts, getProductById, createProduct, updateProduct, deleteProduct } = await import('./controllers/productController.js');
+  
+  if (path === '/api/products' && request.method === 'GET') {
+    return await getAllProducts(env);
+  } else if (path.match(/^\/api\/products\/\d+$/) && request.method === 'GET') {
+    const id = path.split('/').pop();
+    return await getProductById(id, env);
+  } else if (path === '/api/products' && request.method === 'POST') {
+    const body = await request.json();
+    return await createProduct(body, env);
+  } else if (path.match(/^\/api\/products\/\d+$/) && request.method === 'PUT') {
+    const id = path.split('/').pop();
+    const body = await request.json();
+    return await updateProduct(id, body, env);
+  } else if (path.match(/^\/api\/products\/\d+$/) && request.method === 'DELETE') {
+    const id = path.split('/').pop();
+    return await deleteProduct(id, env);
+  }
+  
+  return new Response('Not Found', { status: 404 });
+}
 
-// Routes
-app.use('/api/auth', authRoutes);
-app.use('/api/products', productRoutes);
-app.use('/api/quotes', quoteRoutes);
-app.use('/api/verify', verificationRoutes);
+// Quote routes handler
+async function handleQuoteRoutes(request, env, path) {
+  // Import quote controller functions
+  const { createQuote, getQuoteById, getAllQuotes, updateQuoteStatus } = await import('./controllers/quoteController.js');
+  
+  if (path === '/api/quotes' && request.method === 'POST') {
+    const body = await request.json();
+    return await createQuote(body, env);
+  } else if (path.match(/^\/api\/quotes\/\d+$/) && request.method === 'GET') {
+    const id = path.split('/').pop();
+    return await getQuoteById(id, env);
+  } else if (path === '/api/quotes' && request.method === 'GET') {
+    return await getAllQuotes(env);
+  } else if (path.match(/^\/api\/quotes\/\d+\/status$/) && request.method === 'PUT') {
+    const id = path.split('/')[3];
+    const body = await request.json();
+    return await updateQuoteStatus(id, body, env);
+  }
+  
+  return new Response('Not Found', { status: 404 });
+}
 
-// Error handler
-app.use(errorHandler);
-
-const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => {
-  console.log(`Server running on port ${PORT}`);
-});
+// Verification routes handler
+async function handleVerificationRoutes(request, env, path) {
+  // Import verification controller functions
+  const { verifyEmail, resendVerification } = await import('./controllers/verificationController.js');
+  
+  if (path === '/api/verify/email' && request.method === 'POST') {
+    const body = await request.json();
+    return await verifyEmail(body, env);
+  } else if (path === '/api/verify/resend' && request.method === 'POST') {
+    const body = await request.json();
+    return await resendVerification(body, env);
+  }
+  
+  return new Response('Not Found', { status: 404 });
+}

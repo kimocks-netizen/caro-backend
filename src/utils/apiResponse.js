@@ -1,19 +1,35 @@
 class ApiResponse {
-  static success(res, data, message = 'Success', statusCode = 200) {
-    return res.status(statusCode).json({
+  static success(data, message = 'Success', statusCode = 200) {
+    return new Response(JSON.stringify({
       success: true,
       message,
       data
+    }), {
+      status: statusCode,
+      headers: {
+        'Content-Type': 'application/json',
+        'Access-Control-Allow-Origin': '*',
+        'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
+        'Access-Control-Allow-Headers': 'Content-Type, Authorization'
+      }
     });
   }
 
-  static error(res, message = 'An error occurred', statusCode = 500, errors) {
-    return res.status(statusCode).json({
+  static error(message = 'An error occurred', statusCode = 500, errors = null) {
+    return new Response(JSON.stringify({
       success: false,
       message,
       errors
+    }), {
+      status: statusCode,
+      headers: {
+        'Content-Type': 'application/json',
+        'Access-Control-Allow-Origin': '*',
+        'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
+        'Access-Control-Allow-Headers': 'Content-Type, Authorization'
+      }
     });
   }
 }
 
-module.exports = { ApiResponse };
+export { ApiResponse };

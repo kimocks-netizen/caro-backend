@@ -1,8 +1,9 @@
-const { supabase } = require('../models/supabaseModel');
-const { ApiResponse } = require('./apiResponse');
+import { createSupabaseClient } from '../models/supabaseModel.js';
+import { ApiResponse } from './apiResponse.js';
 
-exports.sendVerificationEmail = async (email, trackingCode) => {
+export const sendVerificationEmail = async (email, trackingCode, env) => {
   try {
+    const supabase = createSupabaseClient(env);
     const code = Math.floor(100000 + Math.random() * 900000).toString();
     const expiresAt = new Date(Date.now() + 15 * 60 * 1000);
     
@@ -49,8 +50,9 @@ exports.sendVerificationEmail = async (email, trackingCode) => {
   }
 };
 
-exports.verifyCode = async (email, code) => {
+export const verifyCode = async (email, code, env) => {
   try {
+    const supabase = createSupabaseClient(env);
     const { data, error } = await supabase
       .from('verification_codes')
       .select('*')

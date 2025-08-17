@@ -1,0 +1,14 @@
+name = "backend-caro"
+main = "src/app.js"   # your entrypoint
+compatibility_date = "2025-08-17"  # use today's date
+compatibility_flags = ["nodejs_compat"]
+
+[vars]
+SUPABASE_URL="https://hphbddrjfwidtmdlmufz.supabase.co"
+SUPABASE_KEY="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhwaGJkZHJqZndpZHRtZGxtdWZ6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTI3ODIwODIsImV4cCI6MjA2ODM1ODA4Mn0.KJq4lyXIw9-1aezELhsm-GJo3RPsqjP35BBymSeo12Y"
+JWT_SECRET="eabe75fdbeeea07e46831cea7bdf924fbd984eec65efad24d5ff47b9c38be176"
+JWT_EXPIRES_IN="2h"
+ALLOWED_ORIGINS="http://localhost:3000,http://localhost:5173,https://carogroupinvestments.com,http://carogroupinvestments.com,https://caro-group-investments.pages.dev,https://caro-group-investments.pages.dev/"
+
+[observability]
+enabled = true

@@ -1,28 +1,30 @@
 //supabaseModel.js
-const { createClient } = require('@supabase/supabase-js');
-require('dotenv').config();
+import { createClient } from '@supabase/supabase-js';
 
-// Supabase client configuration
-const supabaseUrl = process.env.SUPABASE_URL;
-const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_KEY;
+// Supabase client configuration - will be passed from env
+export const createSupabaseClient = (env) => {
+  const supabaseUrl = env.SUPABASE_URL;
+  const supabaseServiceKey = env.SUPABASE_SERVICE_ROLE_KEY || env.SUPABASE_KEY;
 
-if (!supabaseUrl || !supabaseServiceKey) {
-  console.error('Missing Supabase environment variables');
-  console.error('SUPABASE_URL:', !!process.env.SUPABASE_URL);
-  console.error('SUPABASE_SERVICE_ROLE_KEY:', !!process.env.SUPABASE_SERVICE_ROLE_KEY);
-  console.error('SUPABASE_KEY:', !!process.env.SUPABASE_KEY);
-}
-
-// Create Supabase client with available key
-exports.supabase = createClient(supabaseUrl, supabaseServiceKey, {
-  auth: {
-    autoRefreshToken: false,
-    persistSession: false
+  if (!supabaseUrl || !supabaseServiceKey) {
+    console.error('Missing Supabase environment variables');
+    console.error('SUPABASE_URL:', !!env.SUPABASE_URL);
+    console.error('SUPABASE_SERVICE_ROLE_KEY:', !!env.SUPABASE_SERVICE_ROLE_KEY);
+    console.error('SUPABASE_KEY:', !!env.SUPABASE_KEY);
+    throw new Error('Missing Supabase environment variables');
   }
-});
+
+  // Create Supabase client with available key
+  return createClient(supabaseUrl, supabaseServiceKey, {
+    auth: {
+      autoRefreshToken: false,
+      persistSession: false
+    }
+  });
+};
 
 // Storage helper functions
-exports.uploadProductImage = async (fileBuffer, fileName, bucket = 'product-images') => {
+export const uploadProductImage = async (supabase, fileBuffer, fileName, bucket = 'product-images') => {
   const { data, error } = await supabase.storage
     .from(bucket)
     .upload(fileName, fileBuffer);
@@ -31,7 +33,7 @@ exports.uploadProductImage = async (fileBuffer, fileName, bucket = 'product-imag
   return data;
 };
 
-exports.getPublicUrl = (fileName, bucket = 'product-images') => {
+export const getPublicUrl = (supabase, fileName, bucket = 'product-images') => {
   const { data: { publicUrl } } = supabase.storage
     .from(bucket)
     .getPublicUrl(fileName);
@@ -39,7 +41,7 @@ exports.getPublicUrl = (fileName, bucket = 'product-images') => {
 };
 
 // Product model methods
-exports.createProduct = async (productData) => {
+export const createProduct = async (supabase, productData) => {
   // Ensure image_url is properly formatted
   const images = Array.isArray(productData.image_url) 
     ? productData.image_url 
@@ -54,7 +56,7 @@ exports.createProduct = async (productData) => {
   return { data, error };
 };
 
-exports.updateProduct = async (id, productData) => {
+export const updateProduct = async (supabase, id, productData) => {
   // Handle image_url formatting
   const updateData = { ...productData };
   if (productData.image_url) {
