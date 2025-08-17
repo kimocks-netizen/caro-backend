@@ -1,3 +1,4 @@
+//productController.js
 const { supabase } = require('../models/supabaseModel');
 const { ApiResponse } = require('../utils/apiResponse');
 
