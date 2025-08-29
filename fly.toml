@@ -1,0 +1,22 @@
+# fly.toml app configuration file generated for caro-backend on 2025-08-27T19:50:13+02:00
+#
+# See https://fly.io/docs/reference/configuration/ for information about how to use this file.
+#
+
+app = 'caro-backend'
+primary_region = 'jnb'
+
+[build]
+
+[http_service]
+  internal_port = 3000
+  force_https = true
+  auto_stop_machines = true
+  auto_start_machines = true
+  min_machines_running = 1
+  processes = ['app']
+
+[[vm]]
+  memory = '512mb'
+  cpu_kind = 'shared'
+  cpus = 1

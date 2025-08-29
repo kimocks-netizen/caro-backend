@@ -6,6 +6,7 @@
   "scripts": {
     "start": "node src/app.js",
     "dev": "nodemon src/app.js",
+    "build": "echo 'Build completed - no compilation needed for Node.js'",
     "test": "jest"
   },
   "keywords": [],
@@ -21,6 +22,7 @@
     "multer": "^2.0.2"
   },
   "devDependencies": {
+    "@flydotio/dockerfile": "^0.7.10",
     "nodemon": "^3.1.10"
   },
   "engines": {
