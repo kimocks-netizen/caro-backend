@@ -108,6 +108,87 @@ exports.sendQuoteConfirmationEmail = async (email, trackingCode) => {
   }
 };
 
+exports.sendQuoteIssuedEmail = async (email, trackingCode, quoteData) => {
+  try {
+    // Determine the base URL based on environment
+    const baseUrl = process.env.NODE_ENV === 'production' 
+      ? 'https://carogroupinvestments.com' 
+      : 'http://localhost:5173';
+    
+    const trackingUrl = `${baseUrl}/quote/track/${trackingCode}`;
+    
+    // Send quote issued email using Resend
+    const { data, error: emailError } = await resend.emails.send({
+      from: 'noreply@carogroupinvestments.com',
+      to: email,
+      subject: 'Your Quote is Ready!',
+      html: `
+        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; background: #FFFFFF; color: #000000;">
+          <div style="text-align: center; margin-bottom: 30px;">
+            <h1 style="color: #6D28D9; margin: 0; font-size: 28px;">Your Quote is Ready!</h1>
+          </div>
+          
+          <div style="background: #F8F9FA; padding: 20px; border-radius: 8px; margin-bottom: 20px; border: 1px solid #E5E7EB;">
+            <p style="margin: 0 0 10px 0; font-size: 16px; color: #000000;">Your quote has been prepared and is ready for review.</p>
+            <div style="background: #6D28D9; color: white; padding: 15px; text-align: center; font-size: 24px; font-weight: bold; letter-spacing: 2px; border-radius: 4px; margin: 15px 0;">
+              ${trackingCode}
+            </div>
+          </div>
+          
+          <div style="background: #F8F9FA; padding: 20px; border-radius: 8px; margin-bottom: 20px; border: 1px solid #E5E7EB;">
+            <h3 style="color: #6D28D9; margin: 0 0 15px 0;">Quote Summary</h3>
+            <p style="margin: 5px 0; color: #000000;"><strong>Quote Number:</strong> ${quoteData.quote_number || 'N/A'}</p>
+            <p style="margin: 5px 0; color: #000000;"><strong>Status:</strong> <span style="color: #6D28D9;">Quote Issued</span></p>
+            <p style="margin: 5px 0; color: #000000;"><strong>Valid Until:</strong> ${quoteData.valid_until ? new Date(quoteData.valid_until).toLocaleDateString() : 'N/A'}</p>
+            ${quoteData.subtotal ? `<p style="margin: 5px 0; color: #000000;"><strong>Subtotal:</strong> R${quoteData.subtotal.toFixed(2)}</p>` : ''}
+            ${quoteData.vat_amount ? `<p style="margin: 5px 0; color: #000000;"><strong>VAT (15%):</strong> R${quoteData.vat_amount.toFixed(2)}</p>` : ''}
+            ${quoteData.total_amount ? `<p style="margin: 5px 0; color: #000000;"><strong>Total Amount:</strong> R${quoteData.total_amount.toFixed(2)}</p>` : ''}
+          </div>
+          
+          <div style="text-align: center; margin: 30px 0;">
+            <a href="${trackingUrl}" style="background: #6D28D9; color: white; padding: 15px 30px; text-decoration: none; border-radius: 4px; font-weight: bold; display: inline-block;">
+              View Your Quote
+            </a>
+          </div>
+          
+          <p style="font-size: 16px; line-height: 1.6; margin-bottom: 20px; color: #000000;">
+            Click the button above to view your complete quote details, including itemized pricing and terms.
+          </p>
+          
+          <div style="background: #F8F9FA; padding: 15px; border-radius: 4px; margin-bottom: 20px; border: 1px solid #E5E7EB;">
+            <p style="margin: 0; font-size: 14px; color: #FCD34D;">
+              <strong>Next Steps:</strong><br>
+              <span style="color: #000000;">
+              • Review your quote details<br>
+              • Contact us if you have any questions<br>
+              • Accept the quote to proceed with your order<br>
+              • Quote is valid for 7 days from issue date
+              </span>
+            </p>
+          </div>
+          
+          <p style="font-size: 14px; color: #6B7280; margin-top: 30px;">
+            If you have any questions about this quote, please don't hesitate to contact us.
+          </p>
+          
+          <div style="border-top: 1px solid #E5E7EB; padding-top: 20px; margin-top: 30px; text-align: center;">
+            <p style="font-size: 12px; color: #6B7280; margin: 0;">
+              This email was sent from Caro Group Investments. If you have any questions, please contact us directly.
+            </p>
+          </div>
+        </div>
+      `
+    });
+
+    if (emailError) throw emailError;
+    
+    return { success: true };
+  } catch (error) {
+    console.error('Quote issued email sending error:', error);
+    throw new Error('Failed to send quote issued email');
+  }
+};
+
 exports.verifyCode = async (email, code) => {
   try {
     console.log('Looking up verification code:', { email, code });

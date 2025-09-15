@@ -1,6 +1,6 @@
 const { supabase } = require('../models/supabaseModel');
 const { generateTrackingCode } = require('../utils/generateTracking');
-const { sendVerificationEmail, sendQuoteConfirmationEmail, verifyCode } = require('../utils/emailService');
+const { sendVerificationEmail, sendQuoteConfirmationEmail, verifyCode, sendQuoteIssuedEmail } = require('../utils/emailService');
 const { ApiResponse } = require('../utils/apiResponse');
 
 // Generate quote number
@@ -385,6 +385,15 @@ exports.issueQuote = async (req, res) => {
       .single();
 
     if (error) throw error;
+
+    // Send quote issued email notification
+    try {
+      await sendQuoteIssuedEmail(quote.guest_email, quote.tracking_code, quote);
+      console.log('Quote issued email sent successfully to:', quote.guest_email);
+    } catch (emailError) {
+      console.error('Quote issued email sending failed:', emailError);
+      // Don't fail the quote issuance if email fails
+    }
 
     return ApiResponse.success(res, quote, 'Quote issued successfully');
   } catch (error) {
