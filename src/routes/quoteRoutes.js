@@ -7,13 +7,15 @@ const {
   getQuoteById,
   updateQuoteStatus,
   updateQuotePricing,
-  issueQuote
+  issueQuote,
+  verifyQuoteEmail
 } = require('../controllers/quoteController');
 
 const router = express.Router();
 
 // Public routes
 router.post('/', submitQuote);
+router.post('/verify', verifyQuoteEmail);
 router.get('/:trackingCode', getQuoteByTracking);
 
 // Admin routes (require authentication)

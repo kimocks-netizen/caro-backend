@@ -1,6 +1,6 @@
 const { supabase } = require('../models/supabaseModel');
 const { generateTrackingCode } = require('../utils/generateTracking');
-const { sendVerificationEmail, sendQuoteConfirmationEmail } = require('../utils/emailService');
+const { sendVerificationEmail, sendQuoteConfirmationEmail, verifyCode } = require('../utils/emailService');
 const { ApiResponse } = require('../utils/apiResponse');
 
 // Generate quote number
@@ -111,16 +111,23 @@ exports.submitQuote = async (req, res) => {
       return ApiResponse.error(res, `Failed to create quote items: ${itemsError.message}`, 500);
     }
 
-    // Send confirmation email (optional - don't fail if email fails)
+    // Send verification email first (required for email verification)
     try {
-      await sendQuoteConfirmationEmail(email, trackingCode);
-      console.log('Confirmation email sent successfully to:', email);
+      await sendVerificationEmail(email, trackingCode);
+      console.log('Verification email sent successfully to:', email);
     } catch (emailError) {
-      console.error('Confirmation email sending failed:', emailError);
-      // Don't fail the quote submission if email fails
+      console.error('Verification email sending failed:', emailError);
+      // Clean up the quote if email fails
+      await supabase.from('quotes').delete().eq('id', quote.id);
+      return ApiResponse.error(res, 'Failed to send verification email. Please try again.', 500);
     }
 
-    return ApiResponse.success(res, { trackingCode, quoteNumber }, 'Quote submitted successfully', 201);
+    return ApiResponse.success(res, { 
+      trackingCode, 
+      quoteNumber, 
+      requiresVerification: true,
+      message: 'Quote created successfully. Please check your email for verification code.'
+    }, 'Quote created. Email verification required.', 201);
   } catch (error) {
     console.error('Submit quote error:', error);
     return ApiResponse.error(res, 'Failed to submit quote');
@@ -383,5 +390,60 @@ exports.issueQuote = async (req, res) => {
   } catch (error) {
     console.error('Issue quote error:', error);
     return ApiResponse.error(res, 'Failed to issue quote');
+  }
+};
+
+exports.verifyQuoteEmail = async (req, res) => {
+  const { email, code } = req.body;
+
+  if (!email || !code) {
+    return ApiResponse.error(res, 'Email and verification code are required', 400);
+  }
+
+  try {
+    console.log('Verification attempt:', { email, code });
+    
+    // Verify the code
+    const verificationResult = await verifyCode(email, code);
+    console.log('Verification result:', verificationResult);
+    
+    if (!verificationResult.valid) {
+      return ApiResponse.error(res, verificationResult.message || 'Invalid verification code', 400);
+    }
+
+    // Get the most recent verified quote for this email
+    const { data: quotes, error: quoteError } = await supabase
+      .from('quotes')
+      .select('*')
+      .eq('guest_email', email)
+      .eq('verified', true)
+      .order('created_at', { ascending: false })
+      .limit(1);
+
+    console.log('Quote lookup result:', { quotes, quoteError });
+
+    if (quoteError || !quotes || quotes.length === 0) {
+      return ApiResponse.error(res, 'No verified quote found for this email', 404);
+    }
+
+    const quote = quotes[0];
+
+    // Send confirmation email
+    try {
+      await sendQuoteConfirmationEmail(email, quote.tracking_code);
+      console.log('Confirmation email sent successfully to:', email);
+    } catch (emailError) {
+      console.error('Confirmation email sending failed:', emailError);
+      // Don't fail verification if confirmation email fails
+    }
+
+    return ApiResponse.success(res, { 
+      trackingCode: quote.tracking_code,
+      quoteNumber: quote.quote_number,
+      verified: true
+    }, 'Email verified successfully. Quote confirmed.');
+  } catch (error) {
+    console.error('Email verification error:', error);
+    return ApiResponse.error(res, 'Failed to verify email');
   }
 };
