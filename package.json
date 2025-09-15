@@ -19,7 +19,8 @@
     "dotenv": "^16.6.1",
     "express": "^4.21.2",
     "jsonwebtoken": "^9.0.2",
-    "multer": "^2.0.2"
+    "multer": "^2.0.2",
+    "resend": "^6.0.3"
   },
   "devDependencies": {
     "@flydotio/dockerfile": "^0.7.10",

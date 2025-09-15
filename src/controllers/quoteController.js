@@ -1,6 +1,6 @@
 const { supabase } = require('../models/supabaseModel');
 const { generateTrackingCode } = require('../utils/generateTracking');
-const { sendVerificationEmail } = require('../utils/emailService');
+const { sendVerificationEmail, sendQuoteConfirmationEmail } = require('../utils/emailService');
 const { ApiResponse } = require('../utils/apiResponse');
 
 // Generate quote number
@@ -111,11 +111,12 @@ exports.submitQuote = async (req, res) => {
       return ApiResponse.error(res, `Failed to create quote items: ${itemsError.message}`, 500);
     }
 
-    // Send verification email (optional - don't fail if email fails)
+    // Send confirmation email (optional - don't fail if email fails)
     try {
-      await sendVerificationEmail(email, trackingCode);
+      await sendQuoteConfirmationEmail(email, trackingCode);
+      console.log('Confirmation email sent successfully to:', email);
     } catch (emailError) {
-      console.error('Email sending failed:', emailError);
+      console.error('Confirmation email sending failed:', emailError);
       // Don't fail the quote submission if email fails
     }
 
